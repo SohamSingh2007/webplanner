@@ -7,12 +7,12 @@ import {
 } from "@/lib/supabase";
 import { 
   DashboardTab, DailyPlannerTab, ChapterTrackerTab, RevisionPlannerTab, 
-  HoursTrackerTab, TestTrackerTab, MockTestTab, 
+  HoursTrackerTab, MockTestTab, StudyTimerTab,
   PREDEFINED_CHAPTERS, SUBJECT_DETAILS, getLocalDateString
 } from "@/components/tracker";
 import { 
   BookOpen, Calendar, Clock, Award, FileText, CheckCircle, 
-  Settings, LogOut, ShieldAlert, ArrowRight, Activity, Database, X
+  Settings, LogOut, ShieldAlert, ArrowRight, Activity, Database, X, Timer, PenTool
 } from "lucide-react";
 import { useToast } from "@/components/toast";
 
@@ -399,7 +399,20 @@ export default function Home() {
     if (isDemoMode) {
       setIsDemoMode(false);
       setUser(null);
-      localStorage.removeItem("ca_tracker_demo_active");
+      const demoKeys = [
+        "ca_tracker_demo_active",
+        "ca_tracker_demo_user",
+        "ca_demo_chapter_progress",
+        "ca_demo_day_plans",
+        "ca_demo_revision_entries",
+        "ca_demo_sa_tracker",
+        "ca_demo_study_hours",
+        "ca_demo_test_scores",
+        "ca_demo_mock_tests",
+        "ca_demo_user_preferences"
+      ];
+      demoKeys.forEach(k => localStorage.removeItem(k));
+      window.location.reload();
     } else if (supabaseClient) {
       await supabaseClient.auth.signOut();
       setUser(null);
@@ -1065,22 +1078,6 @@ export default function Home() {
                 >
                   {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
                 </button>
-                <div className="mt-4 pt-3 border-t border-stone-100 flex flex-col items-center gap-1">
-                  <span className="text-[10px] text-stone-400 font-mono">
-                    Connecting to: {credentials.url || "Empty URL"}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setConfigUrl(credentials.url);
-                      setConfigAnonKey(credentials.anonKey);
-                      setShowConfigModal(true);
-                    }}
-                    className="text-[10px] text-stone-500 hover:text-stone-850 underline underline-offset-2"
-                  >
-                    Change Supabase settings
-                  </button>
-                </div>
               </div>
             </form>
           ) : (
@@ -1262,43 +1259,49 @@ export default function Home() {
         </header>
 
         {/* Tabs navigation panel */}
-        <nav className="bg-white border-b border-stone-250 py-1.5 px-6 md:px-8">
-          <div className="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-1 md:gap-2">
-              {[
-                { id: "dashboard", label: "Dashboard", icon: BookOpen },
-                { id: "planner", label: "Daily Planner", icon: Calendar },
-                { id: "chapters", label: "Chapter Tracker", icon: CheckCircle },
-                { id: "revisions", label: "Revision Planner", icon: Clock },
-                { id: "hours", label: "Hours Tracker", icon: Activity },
-                { id: "tests", label: "Test Tracker", icon: Award },
-                { id: "mocks", label: "Mock Test", icon: FileText }
-              ].map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-stone-900 text-white shadow-sm'
-                        : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
-                  </button>
-                );
-              })}
+        <nav className="bg-white border-b border-stone-250 sticky top-0 z-30">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex items-center gap-1 md:gap-2 px-4 md:px-8 py-2 min-w-max">
+                {[
+                  { id: "dashboard", label: "Dashboard", icon: BookOpen },
+                  { id: "planner", label: "Daily Planner", icon: Calendar },
+                  { id: "chapters", label: "Chapter Tracker", icon: CheckCircle },
+                  { id: "revisions", label: "Revision Planner", icon: Clock },
+                  { id: "hours", label: "Hours Tracker", icon: Activity },
+                  { id: "mocks", label: "Test Tracker", icon: FileText },
+                  { id: "clock", label: "Study Clock", icon: Timer }
+                ].map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
+                        activeTab === tab.id
+                          ? 'bg-stone-900 text-white shadow-sm px-3 py-2'
+                          : 'text-stone-500 hover:text-stone-900 hover:bg-stone-50 px-2 sm:px-3 py-2'
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className={`${activeTab === tab.id ? 'block' : 'hidden md:block'}`}>
+                        {tab.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-1.5 px-3 py-2 text-stone-500 hover:text-red-650 hover:bg-red-50/50 rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-red-100"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign Out
-            </button>
+            <div className="flex-shrink-0 pl-2 pr-4 md:pr-8 py-2 bg-white relative z-10 before:content-[''] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[20px] before:bg-gradient-to-r before:from-transparent before:to-white">
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-1.5 px-3 py-2 text-stone-500 hover:text-red-650 hover:bg-red-50/50 rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-red-100"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </button>
+            </div>
           </div>
         </nav>
       </div>
@@ -1318,6 +1321,7 @@ export default function Home() {
             onAddPlan={handleAddPlan}
             onUpdatePlan={handleUpdatePlan}
             onDeletePlan={handleDeletePlan}
+            toast={toast}
           />
         )}
         {activeTab === "chapters" && (
@@ -1347,15 +1351,6 @@ export default function Home() {
             toast={toast}
           />
         )}
-        {activeTab === "tests" && (
-          <TestTrackerTab 
-            testScores={testScores}
-            onAddTest={handleAddTest}
-            onUpdateTest={handleUpdateTest}
-            onDeleteTest={handleDeleteTest}
-            toast={toast}
-          />
-        )}
         {activeTab === "mocks" && (
           <MockTestTab 
             mockTests={mockTests}
@@ -1365,6 +1360,9 @@ export default function Home() {
             toast={toast}
           />
         )}
+        {activeTab === "clock" && (
+          <StudyTimerTab />
+        )}
       </main>
 
       {/* Footer Settings & Sign Out */}
@@ -1372,13 +1370,6 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-4">
             <span className="font-medium text-stone-500">Connected: {user.email}</span>
-            <button
-              onClick={() => setShowConfigModal(true)}
-              className="text-stone-500 hover:text-stone-850 flex items-center gap-1 font-semibold underline underline-offset-2"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              Configure DB Link
-            </button>
             {credentials.isCustom && (
               <button
                 onClick={() => {
@@ -1391,17 +1382,6 @@ export default function Home() {
                 Disconnect DB
               </button>
             )}
-          </div>
-          <div className="flex items-center gap-3">
-            <span>CA Command Centre v1.0.0</span>
-            <span className="text-stone-300">|</span>
-            <button 
-              onClick={handleSignOut}
-              className="text-stone-500 hover:text-red-650 flex items-center gap-1 font-semibold"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Disconnect Session
-            </button>
           </div>
         </div>
       </footer>

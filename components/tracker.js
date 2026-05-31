@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { 
   CheckCircle, Circle, Calendar, BookOpen, Award, Clock, 
   Settings, AlertCircle, Plus, Trash2, Edit, Save, X, Book, 
-  FileText, ShieldAlert, ListChecks, CheckSquare, Square
+  FileText, ShieldAlert, ListChecks, CheckSquare, Square,
+  Play, Pause, RotateCcw, Timer, Maximize
 } from "lucide-react";
 
 // PREDEFINED DATA
@@ -79,12 +80,43 @@ const habitsList = [
   { key: "active_posture", label: "Kept active posture & stayed hydrated" }
 ];
 
-// Helper to format Date standard (YYYY-MM-DD)
 export function getLocalDateString(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function ConfirmModal({ title, message, onConfirm, onCancel, confirmText = "Delete", confirmColor = "bg-[#ef4444] hover:bg-red-600 text-white" }) {
+  return (
+    <div className="fixed inset-0 bg-stone-900/40 flex items-center justify-center p-4 z-[100] animate-fade-in">
+      <div className="bg-white rounded-3xl p-8 max-w-[320px] w-full shadow-2xl flex flex-col items-center text-center">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-4 drop-shadow-sm">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" fill="#ef4444"/>
+          <path d="M12 9V14" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+          <circle cx="12" cy="17.5" r="1.25" fill="white"/>
+        </svg>
+        <h3 className="text-xl font-bold text-stone-900 mb-3">{title}</h3>
+        <p className="text-sm text-stone-500 mb-8 leading-relaxed">
+          {message}
+        </p>
+        <div className="flex gap-3 w-full">
+          <button 
+            onClick={onCancel}
+            className="flex-1 py-3 bg-stone-100 text-stone-700 font-bold rounded-xl hover:bg-stone-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={onConfirm}
+            className={`flex-1 py-3 font-bold rounded-xl transition-colors ${confirmColor}`}
+          >
+            {confirmText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // 1. DASHBOARD TAB
@@ -115,7 +147,6 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Subject cards */}
       <div className="lg:col-span-2 space-y-6">
         <h2 className="font-serif text-2xl font-bold tracking-tight mb-2">Subject Progress Summary</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -133,7 +164,6 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
                   <span className="font-mono text-xl font-bold text-stone-800">{Math.round(progress.pct)}%</span>
                 </div>
                 
-                {/* Progress bar */}
                 <div className="w-full bg-stone-100 h-2 rounded-full mb-4 overflow-hidden">
                   <div 
                     className={`h-full ${details.bar} transition-all duration-500`}
@@ -160,7 +190,6 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
           })}
         </div>
 
-        {/* Habits self-check */}
         <div className="paper-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <ListChecks className="w-5 h-5 text-stone-600" />
@@ -211,11 +240,9 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
         </div>
       </div>
 
-      {/* Priorities and Text Areas */}
       <div className="space-y-6">
         <h2 className="font-serif text-2xl font-bold tracking-tight mb-2">Focus Dashboard</h2>
         
-        {/* Top Priorities */}
         <div className="paper-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <Award className="w-5 h-5 text-amber-600" />
@@ -237,7 +264,6 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
           </div>
         </div>
 
-        {/* Weak Topics */}
         <div className="paper-card p-6">
           <h3 className="font-serif text-lg font-bold text-stone-900 mb-2">Weak Topics & Gaps</h3>
           <p className="text-stone-400 text-xs mb-3">List concepts needing extra revision or practice.</p>
@@ -249,7 +275,6 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
           />
         </div>
 
-        {/* Weekly Review */}
         <div className="paper-card p-6">
           <h3 className="font-serif text-lg font-bold text-stone-900 mb-2">Weekly Reflections</h3>
           <p className="text-stone-400 text-xs mb-3">Reflect on wins, blockers, and adjustments.</p>
@@ -266,11 +291,12 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
 }
 
 // 2. DAILY PLANNER TAB
-export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePlan }) {
+export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePlan, toast }) {
   const [selectedDate, setSelectedDate] = useState(getLocalDateString());
-  const [slot, setSlot] = useState("06:00 AM - 08:00 AM");
-  const [isCustomSlot, setIsCustomSlot] = useState(false);
-  const [customSlot, setCustomSlot] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [deletingId, setDeletingId] = useState(null);
+  const [startTime, setStartTime] = useState("06:00");
+  const [endTime, setEndTime] = useState("08:00");
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
   const [target, setTarget] = useState("");
@@ -278,26 +304,55 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
 
   const filteredPlans = dayPlans.filter(p => p.date === selectedDate);
   const totalHours = filteredPlans.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0);
+  
+  const displayPlans = filterType === "all" 
+    ? filteredPlans 
+    : filterType === "general"
+      ? filteredPlans.filter(p => !p.subject || p.subject === "general")
+      : filteredPlans.filter(p => p.subject === filterType);
+
+  const formatTime12Hour = (timeStr) => {
+    if (!timeStr) return "";
+    const [h, m] = timeStr.split(':');
+    const hours = parseInt(h, 10);
+    const suffix = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12.toString().padStart(2, '0')}:${m} ${suffix}`;
+  };
+
+  useEffect(() => {
+    if (startTime && endTime) {
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = endTime.split(':').map(Number);
+      let diff = (endH + endM / 60) - (startH + startM / 60);
+      if (diff < 0) diff += 24;
+      setHours(diff.toFixed(1).replace('.0', ''));
+    }
+  }, [startTime, endTime]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!slot) return;
+    
+    // Check if everything is filled
+    if (!selectedDate || !startTime || !endTime || !subject || !topic.trim() || !target.trim() || !hours) {
+      if (toast && toast.error) {
+        toast.error("Please fill in all fields (Subject, Topic, Target, and Hours) to add a time block.");
+      }
+      return;
+    }
+
+    const generatedSlot = `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
     
     onAddPlan({
       date: selectedDate,
-      time_slot: slot,
-      subject: subject || "",
-      topic: topic || "",
-      target: target || "",
+      time_slot: generatedSlot,
+      subject: subject,
+      topic: topic,
+      target: target,
       hours: parseFloat(hours) || 0,
       done: false
     });
 
-    if (isCustomSlot) {
-      setCustomSlot("");
-      setSlot("06:00 AM - 08:00 AM");
-      setIsCustomSlot(false);
-    }
     setSubject("");
     setTopic("");
     setTarget("");
@@ -306,7 +361,6 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Time Slot Form */}
       <div className="lg:col-span-1">
         <div className="paper-card p-6">
           <h2 className="font-serif text-xl font-bold mb-4 flex items-center gap-2">
@@ -326,45 +380,26 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold uppercase text-stone-500 mb-1">Time Slot *</label>
-              <select
-                value={isCustomSlot ? "custom" : slot}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val === "custom") {
-                    setIsCustomSlot(true);
-                    setSlot("");
-                  } else {
-                    setIsCustomSlot(false);
-                    setSlot(val);
-                    setHours("2");
-                  }
-                }}
-                className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 mb-2"
-              >
-                <option value="06:00 AM - 08:00 AM">06:00 AM - 08:00 AM</option>
-                <option value="08:30 AM - 10:30 AM">08:30 AM - 10:30 AM</option>
-                <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM</option>
-                <option value="02:00 PM - 04:00 PM">02:00 PM - 04:00 PM</option>
-                <option value="04:30 PM - 06:30 PM">04:30 PM - 06:30 PM</option>
-                <option value="07:00 PM - 09:00 PM">07:00 PM - 09:00 PM</option>
-                <option value="09:30 PM - 11:30 PM">09:30 PM - 11:30 PM</option>
-                <option value="custom">Custom Slot...</option>
-              </select>
-
-              {isCustomSlot && (
-                <input 
-                  type="text"
-                  placeholder="e.g. 09:15 AM - 11:45 AM"
-                  value={customSlot}
-                  onChange={(e) => {
-                    setCustomSlot(e.target.value);
-                    setSlot(e.target.value);
-                  }}
-                  className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600"
-                  required
-                />
-              )}
+              <div className="grid grid-cols-2 gap-3 mb-2">
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase text-stone-500 mb-1">Start Time *</label>
+                  <input 
+                    type="time" 
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-semibold uppercase text-stone-500 mb-1">End Time *</label>
+                  <input 
+                    type="time" 
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
+                  />
+                </div>
+              </div>
             </div>
 
             <div>
@@ -411,8 +446,8 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
                 step="0.5"
                 placeholder="e.g. 2"
                 value={hours}
-                onChange={(e) => setHours(e.target.value)}
-                className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
+                readOnly
+                className="w-full text-sm bg-stone-100 border border-stone-200 text-stone-500 rounded-lg px-3 py-2 cursor-not-allowed font-mono outline-none"
               />
             </div>
 
@@ -427,7 +462,6 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
         </div>
       </div>
 
-      {/* Slots List */}
       <div className="lg:col-span-2 space-y-4">
         <div className="paper-card p-6">
           <div className="flex justify-between items-center mb-6">
@@ -441,7 +475,32 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
             </div>
           </div>
 
-          {filteredPlans.length === 0 ? (
+          {/* Filter Pills */}
+          {filteredPlans.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              <button 
+                onClick={() => setFilterType("all")}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${filterType === "all" ? "bg-stone-900 text-white shadow-sm" : "bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800"}`}
+              >
+                All
+              </button>
+              {Object.entries(SUBJECT_DETAILS).map(([key, details]) => (
+                <button 
+                  key={key}
+                  onClick={() => setFilterType(key)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    filterType === key 
+                      ? `bg-stone-900 text-white shadow-sm` 
+                      : `bg-stone-100 text-stone-500 hover:bg-stone-200 hover:text-stone-800`
+                  }`}
+                >
+                  {details.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {displayPlans.length === 0 ? (
             <div className="text-center py-12 border border-dashed border-stone-200 rounded-lg">
               <Clock className="w-10 h-10 text-stone-300 mx-auto mb-2" />
               <p className="text-stone-500 text-sm">No time blocks scheduled for this date.</p>
@@ -449,7 +508,7 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredPlans.map((plan) => {
+              {displayPlans.map((plan) => {
                 const subDetails = SUBJECT_DETAILS[plan.subject];
                 return (
                   <div 
@@ -500,11 +559,7 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
                     </div>
 
                     <button
-                      onClick={() => {
-                        if (confirm("Are you sure you want to delete this time block?")) {
-                          onDeletePlan(plan.id);
-                        }
-                      }}
+                      onClick={() => setDeletingId(plan.id)}
                       className="ml-2 p-1 text-stone-300 hover:text-red-600 rounded transition-colors"
                       title="Delete Block"
                     >
@@ -517,6 +572,14 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
           )}
         </div>
       </div>
+      {deletingId && (
+        <ConfirmModal
+          title="Delete Block"
+          message="This will delete this time block from your schedule."
+          onConfirm={() => { onDeletePlan(deletingId); setDeletingId(null); }}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -546,7 +609,6 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
     if (record) {
       onUpdateProgress(record.id, updates, { subject, chapter_index: idx });
     } else {
-      // Create new record
       onUpdateProgress(null, {
         subject,
         chapter_index: idx,
@@ -599,7 +661,6 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
           <p className="text-xs text-stone-400">Track study, revisions, and practice for all 40 chapters</p>
         </div>
         
-        {/* Subject Filter buttons */}
         <div className="flex flex-wrap gap-1.5 bg-stone-100 p-1 rounded-lg border border-stone-200">
           <button 
             onClick={() => setFilterSubject("all")}
@@ -619,7 +680,6 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
         </div>
       </div>
 
-      {/* Chapters Table */}
       <div className="paper-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -658,7 +718,6 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
                       </div>
                     </td>
                     
-                    {/* Checkboxes */}
                     {['done', 'rev1', 'rev2', 'rev3', 'test_done'].map((field) => {
                       const isChecked = !!prog[field];
                       return (
@@ -698,7 +757,6 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
         </div>
       </div>
 
-      {/* Edit Modal */}
       {editingChapter && (
         <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-xl border border-stone-200 max-w-md w-full shadow-2xl p-6 relative">
@@ -764,6 +822,7 @@ export function ChapterTrackerTab({ chapterProgress, onUpdateProgress, onBulkSav
 // 4. REVISION PLANNER TAB
 export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, onUpdateRevision, onDeleteRevision, onUpdateSa, toast }) {
   const [editingRev, setEditingRev] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [topic, setTopic] = useState("");
   const [subject, setSubject] = useState("costing");
   const [dateStudied, setDateStudied] = useState(getLocalDateString());
@@ -773,7 +832,7 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
   const [rev4Date, setRev4Date] = useState("");
   const [notes, setNotes] = useState("");
 
-  const [activeTab, setActiveTab] = useState("revisions"); // 'revisions' or 'sa'
+  const [activeTab, setActiveTab] = useState("revisions");
 
   const getSaStatus = (code) => {
     return saTracker.find(s => s.sa_code === code)?.completed || false;
@@ -836,7 +895,6 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
 
   return (
     <div className="space-y-6">
-      {/* Sub-tab selection */}
       <div className="flex justify-between items-center border-b border-stone-200 pb-3">
         <div className="flex gap-4">
           <button 
@@ -865,7 +923,6 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
       </div>
 
       {activeTab === "revisions" ? (
-        /* REVISION LOG TABLE */
         <div className="paper-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -906,7 +963,6 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
                         <td className="py-3.5 px-4 font-medium text-stone-900">{entry.topic}</td>
                         <td className="py-3.5 px-3 font-mono text-xs text-stone-600">{entry.date_studied}</td>
                         
-                        {/* Dates */}
                         {['rev1_date', 'rev2_date', 'rev3_date', 'rev4_date'].map((field) => (
                           <td key={field} className="py-3.5 px-3 font-mono text-xs text-center">
                             {entry[field] ? (
@@ -932,11 +988,7 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm("Delete this revision entry?")) {
-                                  onDeleteRevision(entry.id);
-                                }
-                              }}
+                              onClick={() => setDeletingId(entry.id)}
                               className="p-1 text-stone-300 hover:text-red-600 hover:bg-stone-100 rounded"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -952,7 +1004,6 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
           </div>
         </div>
       ) : (
-        /* AUDIT SA TRACKER GRID */
         <div className="paper-card p-6">
           <div className="mb-6">
             <h3 className="font-serif text-lg font-bold text-stone-900">Standards on Auditing (SAs)</h3>
@@ -985,7 +1036,15 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
         </div>
       )}
 
-      {/* Modal Dialog for Add/Edit Revision */}
+      {deletingId && (
+        <ConfirmModal
+          title="Delete Revision"
+          message="This will delete this revision entry permanently."
+          onConfirm={() => { onDeleteRevision(deletingId); setDeletingId(null); }}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
+
       {editingRev && (
         <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-white rounded-xl border border-stone-200 max-w-md w-full shadow-2xl p-6 relative">
@@ -1118,11 +1177,8 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
 export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs, onUpdateHours, toast }) {
   const [weeklyTarget, setWeeklyTarget] = useState(userPrefs.weekly_target || 42);
 
-  // Helper to generate the current week's Mon-Sun dates based on current local time
   const getWeekDates = () => {
-    // Current local date
     const today = new Date();
-    // Monday is index 1, Sunday is 0. Adjust so week starts Monday
     const currentDay = today.getDay();
     const distanceToMon = currentDay === 0 ? -6 : 1 - currentDay;
     
@@ -1141,12 +1197,10 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
 
   const weekDates = getWeekDates();
 
-  // Load custom logged hours or sum them from daily plans
   const getHoursForDate = (dateStr) => {
     const manualRecord = studyHours.find(h => h.date === dateStr);
     if (manualRecord) return manualRecord.total_hours;
 
-    // Fallback: sum of checked hours in Daily Planner for that date
     const plansForDay = dayPlans.filter(p => p.date === dateStr && p.done);
     return plansForDay.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0);
   };
@@ -1154,10 +1208,8 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
   const totalWeeklyHours = weekDates.reduce((sum, d) => sum + getHoursForDate(d.dateStr), 0);
   const targetPct = Math.min((totalWeeklyHours / (weeklyTarget || 1)) * 100, 100);
 
-  // Subject-wise hours calculation from day_plans (completed)
   const getSubjectHours = () => {
     const hours = { costing: 0, fm: 0, audit: 0, sm: 0 };
-    // Sum hours of finished tasks in the current week
     const weekDateStrings = weekDates.map(d => d.dateStr);
     
     dayPlans.forEach(p => {
@@ -1178,7 +1230,6 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Weekly target settings & progress */}
       <div className="lg:col-span-1 space-y-6">
         <div className="paper-card p-6">
           <h3 className="font-serif text-lg font-bold text-stone-900 mb-2">Weekly Goal Settings</h3>
@@ -1225,9 +1276,7 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
         </div>
       </div>
 
-      {/* Week inputs and subject chart */}
       <div className="lg:col-span-2 space-y-6">
-        {/* Day-by-day logs */}
         <div className="paper-card p-6">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -1263,7 +1312,6 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
           </div>
         </div>
 
-        {/* Subject wise chart */}
         <div className="paper-card p-6">
           <h3 className="font-serif text-lg font-bold text-stone-900 mb-2">Weekly Subject Breakdown</h3>
           <p className="text-stone-400 text-xs mb-6">Time allocated across subjects this week (from completed planner slots)</p>
@@ -1294,302 +1342,11 @@ export function HoursTrackerTab({ dayPlans, studyHours, userPrefs, onUpdatePrefs
   );
 }
 
-// 6. TEST TRACKER TAB
-export function TestTrackerTab({ testScores, onAddTest, onUpdateTest, onDeleteTest, toast }) {
-  const [editingTest, setEditingTest] = useState(null);
-  
-  const [date, setDate] = useState(getLocalDateString());
-  const [subject, setSubject] = useState("costing");
-  const [chapter, setChapter] = useState("");
-  const [testType, setTestType] = useState("Chapter"); // 'Chapter', 'STP', 'RTP', 'PYQ', 'Mock', 'Other'
-  const [marks, setMarks] = useState("");
-  const [total, setTotal] = useState("100");
-  const [remarks, setRemarks] = useState("");
-
-  const getPillColor = (marks, total) => {
-    const pct = (parseFloat(marks) / (parseFloat(total) || 100)) * 100;
-    if (pct >= 60) return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    if (pct >= 40) return "bg-amber-50 text-amber-700 border-amber-200";
-    return "bg-red-50 text-red-700 border-red-200";
-  };
-
-  const openAddModal = () => {
-    setEditingTest({ isNew: true });
-    setDate(getLocalDateString());
-    setSubject("costing");
-    setChapter("");
-    setTestType("Chapter");
-    setMarks("");
-    setTotal("100");
-    setRemarks("");
-  };
-
-  const openEditModal = (score) => {
-    setEditingTest(score);
-    setDate(score.date || "");
-    setSubject(score.subject || "costing");
-    setChapter(score.chapter || "");
-    setTestType(score.test_type || "Chapter");
-    setMarks(score.marks?.toString() || "");
-    setTotal(score.total?.toString() || "100");
-    setRemarks(score.remarks || "");
-  };
-
-  const handleSave = () => {
-    if (!chapter || !marks || !total) {
-      toast.warning("Please fill in all required fields: Chapter, Marks, and Total.");
-      return;
-    }
-
-    const payload = {
-      date,
-      subject,
-      chapter,
-      test_type: testType,
-      marks: parseFloat(marks) || 0,
-      total: parseFloat(total) || 100,
-      remarks
-    };
-
-    if (editingTest.isNew) {
-      onAddTest(payload);
-    } else {
-      onUpdateTest(editingTest.id, payload);
-    }
-    setEditingTest(null);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="font-serif text-2xl font-bold text-stone-900">Test & Practice Logs</h2>
-          <p className="text-xs text-stone-400">Keep score card updates for chapter tests, RTP, PYQ sets</p>
-        </div>
-        <button
-          onClick={openAddModal}
-          className="bg-stone-900 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-stone-850 active:scale-95 transition-all flex items-center gap-1.5"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Log Score
-        </button>
-      </div>
-
-      <div className="paper-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
-                <th className="py-3 px-4 w-12 font-mono">Date</th>
-                <th className="py-3 px-4">Subject</th>
-                <th className="py-3 px-4">Chapter / Topic</th>
-                <th className="py-3 px-3">Type</th>
-                <th className="py-3 px-3 text-center">Marks</th>
-                <th className="py-3 px-3 text-center">Percentage</th>
-                <th className="py-3 px-4">Remarks</th>
-                <th className="py-3 px-4 w-24 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-100 text-sm">
-              {testScores.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="text-center py-12 text-stone-500 font-serif">
-                    No scores logged yet. Start recording chapter tests to see progress!
-                  </td>
-                </tr>
-              ) : (
-                testScores.map((score) => {
-                  const subDetails = SUBJECT_DETAILS[score.subject];
-                  const pct = ((score.marks / (score.total || 1)) * 100).toFixed(0);
-                  return (
-                    <tr key={score.id} className="hover:bg-stone-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-mono text-xs text-stone-600">{score.date}</td>
-                      <td className="py-3.5 px-4">
-                        {subDetails && (
-                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${subDetails.bg}`}>
-                            {subDetails.name}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3.5 px-4 font-medium text-stone-900">{score.chapter}</td>
-                      <td className="py-3.5 px-3">
-                        <span className="text-xs bg-stone-100 text-stone-700 px-2 py-0.5 rounded font-medium">
-                          {score.test_type}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-3 font-mono text-xs text-center font-bold text-stone-850">
-                        {score.marks} / {score.total}
-                      </td>
-                      <td className="py-3.5 px-3 text-center">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-mono font-bold ${getPillColor(score.marks, score.total)}`}>
-                          {pct}%
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-xs text-stone-500 italic font-serif">
-                        {score.remarks || "—"}
-                      </td>
-                      <td className="py-3.5 px-4 text-center">
-                        <div className="flex justify-center gap-1">
-                          <button
-                            onClick={() => openEditModal(score)}
-                            className="p-1 text-stone-400 hover:text-stone-850 hover:bg-stone-100 rounded"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm("Delete this test score?")) {
-                                onDeleteTest(score.id);
-                              }
-                            }}
-                            className="p-1 text-stone-300 hover:text-red-600 hover:bg-stone-100 rounded"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Edit modal */}
-      {editingTest && (
-        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-xl border border-stone-200 max-w-md w-full shadow-2xl p-6 relative">
-            <button 
-              onClick={() => setEditingTest(null)}
-              className="absolute top-4 right-4 p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-50"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="font-serif text-lg font-bold text-stone-900">
-              {editingTest.isNew ? "Record Test Score" : "Edit Score Log"}
-            </h3>
-            <p className="text-stone-400 text-xs mt-1">Keep track of your evaluation performances</p>
-
-            <div className="mt-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Date</label>
-                  <input 
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Subject</label>
-                  <select
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-semibold"
-                  >
-                    <option value="costing">Costing</option>
-                    <option value="fm">FM</option>
-                    <option value="audit">Audit</option>
-                    <option value="sm">SM</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Chapter / Exam Topic *</label>
-                <input 
-                  type="text"
-                  value={chapter}
-                  onChange={(e) => setChapter(e.target.value)}
-                  placeholder="e.g. Chapter 2 Overheads, RTP May 2026"
-                  className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Test Type</label>
-                <select
-                  value={testType}
-                  onChange={(e) => setTestType(e.target.value)}
-                  className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600"
-                >
-                  <option value="Chapter">Chapter Test</option>
-                  <option value="STP">STP (Syllabus Test Paper)</option>
-                  <option value="RTP">RTP (Revision Test Paper)</option>
-                  <option value="PYQ">PYQ (Previous Year Questions)</option>
-                  <option value="Mock">Mock Test</option>
-                  <option value="Other">Other Practice</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Marks Obtained *</label>
-                  <input 
-                    type="number"
-                    step="0.5"
-                    value={marks}
-                    onChange={(e) => setMarks(e.target.value)}
-                    placeholder="e.g. 18"
-                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Total Marks *</label>
-                  <input 
-                    type="number"
-                    step="0.5"
-                    value={total}
-                    onChange={(e) => setTotal(e.target.value)}
-                    placeholder="e.g. 25"
-                    className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600 font-mono"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-500 uppercase mb-1">Remarks</label>
-                <input 
-                  type="text"
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Mistakes in formulas, missed 1 sub-question"
-                  className="w-full text-sm bg-stone-50 border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-stone-600"
-                />
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button 
-                onClick={() => setEditingTest(null)}
-                className="px-4 py-2 border border-stone-200 rounded-lg text-xs font-semibold text-stone-600 hover:bg-stone-50"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={handleSave}
-                className="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-850"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // 7. MOCK TEST TAB
 export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, toast }) {
   const [editingMock, setEditingMock] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   
   const [date, setDate] = useState(getLocalDateString());
   const [testName, setTestName] = useState("");
@@ -1661,7 +1418,7 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
     <div className="space-y-6">
       {/* Mock average cards */}
       <div>
-        <h2 className="font-serif text-2xl font-bold text-stone-900 mb-4">Mock Exam Dashboard</h2>
+        <h2 className="font-serif text-2xl font-bold text-stone-900 mb-4">Test Tracker Dashboard</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {Object.entries(SUBJECT_DETAILS).map(([key, details]) => {
             const avg = getSubjectMockAvg(key);
@@ -1670,7 +1427,7 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
                 <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${details.bg}`}>
                   {details.name}
                 </span>
-                <p className="font-serif text-xs text-stone-400 font-medium uppercase mt-3">Mock Average</p>
+                <p className="font-serif text-xs text-stone-400 font-medium uppercase mt-3">Test Average</p>
                 <p className="font-mono text-2xl font-extrabold text-stone-850 mt-1">
                   {avg !== null ? `${Math.round(avg)}%` : <span className="text-stone-300 font-serif text-base font-normal italic">No Data</span>}
                 </p>
@@ -1684,15 +1441,15 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-serif text-lg font-bold text-stone-900">Mock Exam Scores</h3>
-            <p className="text-xs text-stone-400">Track 100-mark mock papers and evaluations</p>
+            <h3 className="font-serif text-lg font-bold text-stone-900">Test Scores</h3>
+            <p className="text-xs text-stone-400">Track 100-mark test papers and evaluations</p>
           </div>
           <button
             onClick={openAddModal}
             className="bg-stone-900 text-white text-xs font-semibold px-3 py-2 rounded-lg hover:bg-stone-850 active:scale-95 transition-all flex items-center gap-1.5"
           >
             <Plus className="w-3.5 h-3.5" />
-            Log Mock Paper
+            Log Test Paper
           </button>
         </div>
 
@@ -1703,7 +1460,7 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
                 <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-semibold text-stone-500 uppercase tracking-wider">
                   <th className="py-3 px-4 w-12 font-mono">Date</th>
                   <th className="py-3 px-4">Subject</th>
-                  <th className="py-3 px-4">Mock Test Name</th>
+                  <th className="py-3 px-4">Test Name</th>
                   <th className="py-3 px-3 text-center">Marks</th>
                   <th className="py-3 px-3 text-center">Percentage</th>
                   <th className="py-3 px-4">Remarks / Focus</th>
@@ -1714,7 +1471,7 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
                 {mockTests.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center py-12 text-stone-500 font-serif">
-                      No mock exam scores recorded yet.
+                      No test scores recorded yet.
                     </td>
                   </tr>
                 ) : (
@@ -1752,11 +1509,7 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm("Delete this mock test score?")) {
-                                  onDeleteMock(mock.id);
-                                }
-                              }}
+                              onClick={() => setDeletingId(mock.id)}
                               className="p-1 text-stone-300 hover:text-red-600 hover:bg-stone-100 rounded"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1785,9 +1538,9 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
             </button>
 
             <h3 className="font-serif text-lg font-bold text-stone-900">
-              {editingMock.isNew ? "Record Mock Test Paper" : "Edit Mock Exam Log"}
+              {editingMock.isNew ? "Record Test Paper" : "Edit Test Log"}
             </h3>
-            <p className="text-stone-400 text-xs mt-1">Submit full syllabus mock test marks</p>
+            <p className="text-stone-400 text-xs mt-1">Submit full syllabus test marks</p>
 
             <div className="mt-5 space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -1883,6 +1636,421 @@ export function MockTestTab({ mockTests, onAddMock, onUpdateMock, onDeleteMock, 
           </div>
         </div>
       )}
+
+      {deletingId && (
+        <ConfirmModal
+          title="Delete Score"
+          message="This will permanently delete this test score."
+          onConfirm={() => { onDeleteMock(deletingId); setDeletingId(null); }}
+          onCancel={() => setDeletingId(null)}
+        />
+      )}
     </div>
   );
 }
+
+// FLIP CLOCK COMPONENTS
+function AnimatedCard({ value }) {
+  const [current, setCurrent] = useState(value);
+  const [previous, setPrevious] = useState(value);
+  const [isFlipping, setIsFlipping] = useState(false);
+
+  useEffect(() => {
+    if (value !== current) {
+      setPrevious(current);
+      setCurrent(value);
+      setIsFlipping(true);
+      const timer = setTimeout(() => {
+        setIsFlipping(false);
+        setPrevious(value);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [value, current]);
+
+  return (
+    <div className="flip-card w-14 h-20 sm:w-20 sm:h-28 lg:w-24 lg:h-32 text-3xl sm:text-5xl lg:text-7xl shadow-xl rounded-xl relative [perspective:1000px]">
+      <div className="flip-card-top"><span className="flip-card-text">{current}</span></div>
+      <div className="flip-card-bottom"><span className="flip-card-text">{previous}</span></div>
+      
+      {isFlipping && (
+        <>
+          <div key={`anim-top-${current}`} className="flip-card-top flip-anim-top">
+            <span className="flip-card-text">{previous}</span>
+          </div>
+          <div key={`anim-bottom-${current}`} className="flip-card-bottom flip-anim-bottom">
+            <span className="flip-card-text">{current}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function FlipClock({ seconds }) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  const hStr = h.toString().padStart(2, '0');
+  const mStr = m.toString().padStart(2, '0');
+  const sStr = s.toString().padStart(2, '0');
+
+  return (
+    <div className="flex items-center justify-center gap-1 sm:gap-3 bg-[#0a0a0a] p-3 sm:p-8 rounded-[2rem] shadow-xl border border-stone-800 w-full max-w-lg mb-8 mt-4 mx-auto">
+      {hStr !== "00" && (
+        <>
+          <AnimatedCard value={hStr} />
+          <div className="flex flex-col gap-2 sm:gap-3 pb-2 px-0.5 sm:px-1">
+            <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-stone-700/50"></div>
+            <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-stone-700/50"></div>
+          </div>
+        </>
+      )}
+      <AnimatedCard value={mStr} />
+      <div className="flex flex-col gap-2 sm:gap-3 pb-2 px-0.5 sm:px-1">
+        <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-stone-700/50"></div>
+        <div className="w-1.5 h-1.5 sm:w-2.5 sm:h-2.5 rounded-full bg-stone-700/50"></div>
+      </div>
+      <AnimatedCard value={sStr} />
+    </div>
+  );
+}
+
+// 8. STUDY TIMER TAB
+export function StudyTimerTab() {
+  const timerRef = React.useRef(null);
+  const stopwatchRef = React.useRef(null);
+  const [pomodoroMode, setPomodoroMode] = useState("work"); // 'work' or 'break'
+  const [pomodoroTime, setPomodoroTime] = useState(25 * 60); // 25 mins
+  const [pomodoroActive, setPomodoroActive] = useState(false);
+  const [isEditingPomodoro, setIsEditingPomodoro] = useState(false);
+  const [customHours, setCustomHours] = useState(0);
+  const [customMinutes, setCustomMinutes] = useState(25);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isStopwatchFullscreen, setIsStopwatchFullscreen] = useState(false);
+  
+  const [stopwatchTime, setStopwatchTime] = useState(0);
+  const [stopwatchActive, setStopwatchActive] = useState(false);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Real-time Clock & Fullscreen Listener
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    const handleFsChange = () => {
+      setIsFullscreen(document.fullscreenElement === timerRef.current);
+      setIsStopwatchFullscreen(document.fullscreenElement === stopwatchRef.current);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('fullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  // Pomodoro Timer
+  useEffect(() => {
+    let interval = null;
+    if (pomodoroActive && pomodoroTime > 0) {
+      interval = setInterval(() => {
+        setPomodoroTime(time => time - 1);
+      }, 1000);
+    } else if (pomodoroTime === 0) {
+      setPomodoroActive(false);
+      // Optional: Play a sound here or auto-switch
+    }
+    return () => clearInterval(interval);
+  }, [pomodoroActive, pomodoroTime]);
+
+  // Stopwatch
+  useEffect(() => {
+    let interval = null;
+    if (stopwatchActive) {
+      const startTime = Date.now() - stopwatchTime;
+      interval = setInterval(() => {
+        setStopwatchTime(Date.now() - startTime);
+      }, 10);
+    }
+    return () => clearInterval(interval);
+  }, [stopwatchActive, stopwatchTime]);
+
+  const togglePomodoro = () => setPomodoroActive(!pomodoroActive);
+  
+  const resetPomodoro = () => {
+    setPomodoroActive(false);
+    setPomodoroTime(pomodoroMode === "work" ? 25 * 60 : 5 * 60);
+  };
+  
+  const switchPomodoroMode = (mode) => {
+    setPomodoroMode(mode);
+    setPomodoroActive(false);
+    setPomodoroTime(mode === "work" ? 25 * 60 : 5 * 60);
+  };
+
+  const toggleStopwatch = () => setStopwatchActive(!stopwatchActive);
+  
+  const resetStopwatch = () => {
+    setStopwatchActive(false);
+    setStopwatchTime(0);
+  };
+
+  const formatTime = (seconds) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+    const s = (seconds % 60).toString().padStart(2, '0');
+    if (h > 0) return `${h.toString().padStart(2, '0')}:${m}:${s}`;
+    return `${m}:${s}`;
+  };
+
+  const formatStopwatchTime = (ms) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600).toString().padStart(2, '0');
+    const m = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    const msms = Math.floor((ms % 1000) / 10).toString().padStart(2, '0');
+    return { main: `${h}:${m}:${s}`, ms: msms };
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (timerRef.current) timerRef.current.requestFullscreen().catch(err => console.log(err));
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+    }
+  };
+
+  const toggleStopwatchFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (stopwatchRef.current) stopwatchRef.current.requestFullscreen().catch(err => console.log(err));
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      
+      {/* Current Time Clock */}
+      <div className="lg:col-span-2 flex flex-col items-center justify-center mb-4 mt-2">
+        <p className="text-[10px] uppercase text-stone-400 font-bold tracking-[0.2em] mb-2">Local Time</p>
+        <div className="font-mono flex items-baseline tracking-tight">
+          <span className="text-3xl sm:text-4xl font-light text-stone-800">
+            {currentTime.toLocaleTimeString('en-US', { hour12: true, hour: 'numeric', minute: '2-digit' }).split(' ')[0]}
+          </span>
+          <span className="text-stone-400 text-xl sm:text-2xl ml-1 font-medium">
+            :{currentTime.toLocaleTimeString('en-US', { hour12: false, second: '2-digit' })}
+          </span>
+          <span className="text-stone-300 text-sm sm:text-base ml-2 font-bold tracking-widest">
+            {currentTime.toLocaleTimeString('en-US', { hour12: true }).slice(-2)}
+          </span>
+        </div>
+        <p className="text-[11px] text-stone-500 font-medium mt-3 uppercase tracking-widest">
+          {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+        </p>
+      </div>
+
+      {/* Pomodoro Timer */}
+      <div ref={timerRef} className={`paper-card p-4 sm:p-6 flex flex-col items-center bg-white ${isFullscreen ? 'justify-center h-full' : ''}`}>
+        <div className={`w-full flex justify-between items-center mb-6 z-10 ${isFullscreen ? 'absolute top-6 left-0 px-4 sm:px-8' : 'relative'}`}>
+          <div className="flex items-center gap-2">
+            <Timer className="w-5 h-5 text-amber-600" />
+            <h2 className="font-serif text-xl font-bold text-stone-900">Timer</h2>
+          </div>
+          <button 
+            onClick={toggleFullscreen}
+            className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors"
+            title="Full Screen"
+          >
+            <Maximize className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className={`w-full flex-1 flex flex-col items-center justify-center ${isFullscreen ? 'scale-110 sm:scale-125 md:scale-150 transition-transform duration-500' : ''}`}>
+          
+          <div className="flex bg-stone-100 p-1 rounded-xl items-center mb-6 sm:mb-8 shadow-inner">
+            <button 
+              onClick={() => switchPomodoroMode("work")}
+              className={`text-[11px] sm:text-xs px-6 sm:px-8 py-2 sm:py-2.5 rounded-lg font-bold uppercase tracking-wider transition-all ${
+                pomodoroMode === "work" ? 'bg-white text-stone-800 shadow-md' : 'text-stone-400 hover:text-stone-600'
+              }`}
+            >
+              Work
+            </button>
+            <button 
+              onClick={() => switchPomodoroMode("break")}
+              className={`text-[11px] sm:text-xs px-6 sm:px-8 py-2 sm:py-2.5 rounded-lg font-bold uppercase tracking-wider transition-all ${
+                pomodoroMode === "break" ? 'bg-white text-stone-800 shadow-md' : 'text-stone-400 hover:text-stone-600'
+              }`}
+            >
+              Break
+            </button>
+          </div>
+
+          {isEditingPomodoro ? (
+            <div className="flex flex-col items-center gap-6 bg-stone-50 p-8 rounded-[2rem] border border-stone-100 mb-8 mt-4 shadow-sm w-full max-w-lg">
+              <h3 className="font-serif font-bold text-stone-700 text-lg">Set Custom Timer</h3>
+              <div className="flex items-center justify-center gap-4 font-mono">
+                <div className="flex flex-col items-center">
+                  <input
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={customHours}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val !== "") {
+                        let num = parseInt(val, 10);
+                        if (num > 23) val = "23";
+                        else if (num < 0) val = "0";
+                      }
+                      setCustomHours(val);
+                    }}
+                    className="w-16 h-20 sm:w-28 sm:h-32 md:w-32 md:h-36 text-center text-4xl sm:text-6xl md:text-7xl font-extrabold bg-white border-2 border-stone-200 rounded-2xl shadow-sm focus:outline-none focus:border-stone-800 transition-all text-stone-800"
+                    placeholder="00"
+                  />
+                  <span className="text-stone-400 mt-2 sm:mt-3 text-[10px] font-bold uppercase tracking-widest">Hours</span>
+                </div>
+                <div className="text-2xl sm:text-4xl font-black text-stone-300 pb-8">:</div>
+                <div className="flex flex-col items-center">
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customMinutes}
+                    onChange={(e) => {
+                      let val = e.target.value;
+                      if (val !== "") {
+                        let num = parseInt(val, 10);
+                        if (num > 59) val = "59";
+                        else if (num < 0) val = "0";
+                      }
+                      setCustomMinutes(val);
+                    }}
+                    className="w-16 h-20 sm:w-28 sm:h-32 md:w-32 md:h-36 text-center text-4xl sm:text-6xl md:text-7xl font-extrabold bg-white border-2 border-stone-200 rounded-2xl shadow-sm focus:outline-none focus:border-stone-800 transition-all text-stone-800"
+                    placeholder="00"
+                    autoFocus
+                  />
+                  <span className="text-stone-400 mt-2 sm:mt-3 text-[10px] font-bold uppercase tracking-widest">Minutes</span>
+                </div>
+              </div>
+              <div className="flex gap-3 w-full max-w-xs mt-4">
+                <button 
+                  onClick={() => setIsEditingPomodoro(false)}
+                  className="flex-1 text-sm font-semibold bg-white border-2 border-stone-200 text-stone-600 py-3 rounded-xl hover:bg-stone-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const h = parseInt(customHours || 0, 10);
+                    const m = parseInt(customMinutes || 0, 10);
+                    const totalMins = (h * 60) + m;
+                    if (totalMins > 0) {
+                      setPomodoroTime(totalMins * 60);
+                      setPomodoroActive(false);
+                    }
+                    setIsEditingPomodoro(false);
+                  }}
+                  className="flex-1 text-sm font-bold bg-stone-900 text-white py-3 rounded-xl hover:bg-stone-800 transition-colors shadow-md"
+                >
+                  Save Time
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <FlipClock seconds={pomodoroTime} />
+              <button 
+                onClick={() => {
+                  const totalMins = Math.floor(pomodoroTime / 60);
+                  setCustomHours(Math.floor(totalMins / 60));
+                  setCustomMinutes(totalMins % 60);
+                  setIsEditingPomodoro(true);
+                  setPomodoroActive(false);
+                }}
+                className="text-xs font-semibold text-stone-400 hover:text-stone-700 underline underline-offset-4 mb-4"
+              >
+                Edit Timer Duration
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className={`flex gap-4 w-full z-10 ${isFullscreen ? 'absolute bottom-4 sm:bottom-10 left-0 px-4 sm:px-10 max-w-4xl mx-auto right-0' : 'relative'}`}>
+          <button 
+            onClick={togglePomodoro}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+              pomodoroActive 
+                ? 'bg-amber-100 text-amber-800 hover:bg-amber-200' 
+                : 'bg-stone-900 text-white hover:bg-stone-800'
+            }`}
+          >
+            {pomodoroActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {pomodoroActive ? "Pause" : "Start Focus"}
+          </button>
+          <button 
+            onClick={resetPomodoro}
+            className="w-14 flex items-center justify-center bg-white border-2 border-stone-200 text-stone-500 hover:bg-stone-50 rounded-xl"
+            title="Reset Timer"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Stopwatch Timer */}
+      <div ref={stopwatchRef} className={`paper-card p-4 sm:p-6 flex flex-col items-center bg-white ${isStopwatchFullscreen ? 'justify-center h-full' : ''}`}>
+        <div className={`w-full flex justify-between items-center mb-6 z-10 ${isStopwatchFullscreen ? 'absolute top-6 left-0 px-4 sm:px-8' : 'relative'}`}>
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-blue-600" />
+            <h2 className="font-serif text-xl font-bold text-stone-900">Stopwatch</h2>
+          </div>
+          <button 
+            onClick={toggleStopwatchFullscreen}
+            className="p-1.5 text-stone-400 hover:text-stone-800 hover:bg-stone-100 rounded-md transition-colors"
+            title="Full Screen"
+          >
+            <Maximize className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className={`w-full flex-1 flex flex-col items-center justify-center ${isStopwatchFullscreen ? 'scale-110 sm:scale-125 md:scale-150 transition-transform duration-500' : ''}`}>
+          <div className="w-full max-w-[17rem] sm:max-w-md flex items-center justify-center bg-stone-900 rounded-[2rem] shadow-2xl border border-stone-800 mb-8 mt-4 py-8 px-2 sm:py-12 sm:px-6">
+            <div className="font-mono flex items-baseline text-white">
+              <span className="text-[2.5rem] leading-none sm:text-6xl lg:text-7xl font-black tracking-tight">
+                {formatStopwatchTime(stopwatchTime).main}
+              </span>
+              <span className="text-xl sm:text-3xl lg:text-4xl font-bold text-stone-400 mb-1 tracking-tight ml-1 sm:ml-2">
+                :{formatStopwatchTime(stopwatchTime).ms}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className={`flex gap-4 w-full z-10 ${isStopwatchFullscreen ? 'absolute bottom-4 sm:bottom-10 left-0 px-4 sm:px-10 max-w-4xl mx-auto right-0' : 'relative'}`}>
+          <button 
+            onClick={toggleStopwatch}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-sm transition-all ${
+              stopwatchActive 
+                ? 'bg-blue-100 text-blue-800 hover:bg-blue-200' 
+                : 'bg-stone-900 text-white hover:bg-stone-800'
+            }`}
+          >
+            {stopwatchActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            {stopwatchActive ? "Pause" : "Start Session"}
+          </button>
+          <button 
+            onClick={resetStopwatch}
+            className="w-14 flex items-center justify-center bg-white border-2 border-stone-200 text-stone-500 hover:bg-stone-50 rounded-xl"
+            title="Reset Stopwatch"
+          >
+            <RotateCcw className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+    </div>
+  );
+}
+
