@@ -23,6 +23,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata = {
   title: "CA Inter Group 2 — Study Command Centre",
+  icons: {
+    icon: "/study_planner_1.png",
+  },
   description: "A premium study tracking system for CA Inter Group 2 Sep 2026 attempt with real-time Supabase storage.",
 };
 
