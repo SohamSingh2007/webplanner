@@ -12,7 +12,8 @@ import {
 } from "@/components/tracker";
 import { 
   BookOpen, Calendar, Clock, Award, FileText, CheckCircle, 
-  Settings, LogOut, ShieldAlert, ArrowRight, Activity, Database, X, Timer, PenTool
+  Settings, LogOut, ShieldAlert, ArrowRight, Activity, Database, X, Timer, PenTool,
+  Menu, User, Users, CreditCard, Sun, Moon
 } from "lucide-react";
 import { useToast } from "@/components/toast";
 
@@ -36,6 +37,8 @@ export default function Home() {
 
   // Tab State
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Database States
   const [chapterProgress, setChapterProgress] = useState([]);
@@ -104,6 +107,11 @@ export default function Home() {
       }
     }
 
+    // Load theme
+    if (localStorage.getItem("ca_tracker_theme") === "dark") {
+      setIsDarkMode(true);
+    }
+
     setIsMounted(true);
     
     // Load and recalculate target date
@@ -162,6 +170,19 @@ export default function Home() {
       };
     }
   }, []);
+
+  // Theme toggle effect
+  useEffect(() => {
+    if (!isMounted) return;
+
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('ca_tracker_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('ca_tracker_theme', 'light');
+    }
+  }, [isDarkMode, isMounted]);
 
   // 2. Fetch Data once User/Demo is active
   useEffect(() => {
@@ -1293,14 +1314,64 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex-shrink-0 pl-2 pr-4 md:pr-8 py-2 bg-white relative z-10 before:content-[''] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[20px] before:bg-gradient-to-r before:from-transparent before:to-white">
-              <button
-                onClick={handleSignOut}
-                className="flex items-center gap-1.5 px-3 py-2 text-stone-500 hover:text-red-650 hover:bg-red-50/50 rounded-lg text-xs font-semibold transition-all border border-transparent hover:border-red-100"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
+            <div className="flex-shrink-0 pl-2 pr-4 md:pr-8 py-2 bg-white relative z-10 before:content-[''] before:absolute before:left-[-20px] before:top-0 before:bottom-0 before:w-[20px] scroll-fade-mask">
+              <div className="relative">
+                <button
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="flex items-center justify-center p-2 text-stone-500 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-all"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+
+                {showUserMenu && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => setShowUserMenu(false)}
+                    ></div>
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden animate-fade-in py-2">
+                      <div className="px-4 py-3 border-b border-stone-100 mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-[#292524] rounded-full flex items-center justify-center flex-shrink-0">
+                            <User className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1 overflow-hidden">
+                            <p className="text-sm font-bold text-stone-900 truncate">{user?.email}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 flex items-center justify-between bg-stone-100 rounded-full p-1">
+                          <button 
+                            onClick={() => setIsDarkMode(false)}
+                            className={`flex-1 flex justify-center py-1.5 rounded-full transition-colors ${!isDarkMode ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:text-stone-700'}`}
+                          >
+                            <Sun className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => setIsDarkMode(true)}
+                            className={`flex-1 flex justify-center py-1.5 rounded-full transition-colors ${isDarkMode ? 'bg-white shadow-sm text-stone-900' : 'text-stone-500 hover:text-stone-700'}`}
+                          >
+                            <Moon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="px-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setShowUserMenu(false);
+                            handleSignOut();
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          <span className="font-medium">Sign out</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </nav>
@@ -1365,26 +1436,7 @@ export default function Home() {
         )}
       </main>
 
-      {/* Footer Settings & Sign Out */}
-      <footer className="border-t border-stone-200 mt-auto bg-stone-50/50 py-4 px-6 md:px-8 text-xs text-stone-400">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          <div className="flex items-center gap-4">
-            <span className="font-medium text-stone-500">Connected: {user.email}</span>
-            {credentials.isCustom && (
-              <button
-                onClick={() => {
-                  if (confirm("Disconnect Supabase and switch to local storage?")) {
-                    clearSupabaseCredentials();
-                  }
-                }}
-                className="text-red-500 hover:text-red-700 underline underline-offset-2"
-              >
-                Disconnect DB
-              </button>
-            )}
-          </div>
-        </div>
-      </footer>
+
 
       {/* Credentials Editor Modal from dashboard */}
       {showConfigModal && (

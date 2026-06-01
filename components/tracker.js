@@ -292,16 +292,17 @@ export function DashboardTab({ stats, userPrefs, onUpdatePrefs }) {
 
 // 2. DAILY PLANNER TAB
 export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePlan, toast }) {
-  const [selectedDate, setSelectedDate] = useState(getLocalDateString());
+  const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
   const [filterType, setFilterType] = useState("all");
   const [deletingId, setDeletingId] = useState(null);
-  const [startTime, setStartTime] = useState("06:00");
-  const [endTime, setEndTime] = useState("08:00");
+  
+  const [editingPlanId, setEditingPlanId] = useState(null);
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("11:00");
   const [subject, setSubject] = useState("");
   const [topic, setTopic] = useState("");
   const [target, setTarget] = useState("");
   const [hours, setHours] = useState("2");
-
   const filteredPlans = dayPlans.filter(p => p.date === selectedDate);
   const totalHours = filteredPlans.reduce((sum, p) => sum + (parseFloat(p.hours) || 0), 0);
   
@@ -333,7 +334,6 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
   const handleSubmit = (e) => {
     e.preventDefault();
     
-    // Check if everything is filled
     if (!selectedDate || !startTime || !endTime || !subject || !topic.trim() || !target.trim() || !hours) {
       if (toast && toast.error) {
         toast.error("Please fill in all fields (Subject, Topic, Target, and Hours) to add a time block.");
@@ -343,7 +343,7 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
 
     const generatedSlot = `${formatTime12Hour(startTime)} - ${formatTime12Hour(endTime)}`;
     
-    onAddPlan({
+    const payload = {
       date: selectedDate,
       time_slot: generatedSlot,
       subject: subject,
@@ -351,12 +351,47 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
       target: target,
       hours: parseFloat(hours) || 0,
       done: false
-    });
+    };
+
+    if (editingPlanId) {
+      onUpdatePlan(editingPlanId, payload);
+      setEditingPlanId(null);
+      if (toast && toast.success) toast.success("Time block updated!");
+    } else {
+      onAddPlan(payload);
+      if (toast && toast.success) toast.success("Time block added!");
+    }
 
     setSubject("");
     setTopic("");
     setTarget("");
     setHours("2");
+  };
+
+  const handleEditClick = (plan) => {
+    setEditingPlanId(plan.id);
+    setSubject(plan.subject || "");
+    setTopic(plan.topic || "");
+    setTarget(plan.target || "");
+    setHours(plan.hours.toString());
+    
+    try {
+      const parts = plan.time_slot.split(" - ");
+      if (parts.length === 2) {
+        const parseTo24 = (timeString) => {
+          const match = timeString.match(/(\d+):(\d+)\s*(AM|PM)/i);
+          if (!match) return "00:00";
+          let [_, h, m, modifier] = match;
+          if (h === '12') h = '00';
+          if (modifier.toUpperCase() === 'PM') h = (parseInt(h, 10) + 12).toString();
+          return `${h.padStart(2, '0')}:${m}`;
+        };
+        setStartTime(parseTo24(parts[0]));
+        setEndTime(parseTo24(parts[1]));
+      }
+    } catch(e) {
+      console.log("Error parsing time", e);
+    }
   };
 
   return (
@@ -451,13 +486,39 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
               />
             </div>
 
-            <button 
-              type="submit"
-              className="w-full bg-stone-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-850 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Time Block
-            </button>
+            {editingPlanId ? (
+              <div className="flex gap-3 w-full">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setEditingPlanId(null);
+                    setSubject("");
+                    setTopic("");
+                    setTarget("");
+                    setHours("2");
+                  }}
+                  className="flex-1 bg-white text-stone-600 border border-stone-200 py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-50 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <X className="w-4 h-4" />
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 bg-stone-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-850 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Save className="w-4 h-4" />
+                  Update
+                </button>
+              </div>
+            ) : (
+              <button 
+                type="submit"
+                className="w-full bg-stone-900 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-stone-850 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Plus className="w-4 h-4" />
+                Add Time Block
+              </button>
+            )}
           </form>
         </div>
       </div>
@@ -558,13 +619,22 @@ export function DailyPlannerTab({ dayPlans, onAddPlan, onUpdatePlan, onDeletePla
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setDeletingId(plan.id)}
-                      className="ml-2 p-1 text-stone-300 hover:text-red-600 rounded transition-colors"
-                      title="Delete Block"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center">
+                      <button
+                        onClick={() => handleEditClick(plan)}
+                        className="p-1.5 text-stone-300 hover:text-blue-600 rounded transition-colors"
+                        title="Edit Block"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(plan.id)}
+                        className="ml-1 p-1.5 text-stone-300 hover:text-red-600 rounded transition-colors"
+                        title="Delete Block"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -899,13 +969,13 @@ export function RevisionPlannerTab({ revisionEntries, saTracker, onAddRevision, 
         <div className="flex gap-4">
           <button 
             onClick={() => setActiveTab("revisions")}
-            className={`font-serif text-xl font-bold pb-2 border-b-2 transition-all ${activeTab === "revisions" ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
+            className={`font-serif text-base md:text-xl font-bold pb-2 border-b-2 transition-all ${activeTab === "revisions" ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
           >
             Revision Log
           </button>
           <button 
             onClick={() => setActiveTab("sa")}
-            className={`font-serif text-xl font-bold pb-2 border-b-2 transition-all ${activeTab === "sa" ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
+            className={`font-serif text-base md:text-xl font-bold pb-2 border-b-2 transition-all ${activeTab === "sa" ? 'border-stone-900 text-stone-900' : 'border-transparent text-stone-400 hover:text-stone-600'}`}
           >
             Audit SA Tracker
           </button>
@@ -2016,7 +2086,7 @@ export function StudyTimerTab() {
         </div>
 
         <div className={`w-full flex-1 flex flex-col items-center justify-center ${isStopwatchFullscreen ? 'scale-110 sm:scale-125 md:scale-150 transition-transform duration-500' : ''}`}>
-          <div className="w-full max-w-[17rem] sm:max-w-md flex items-center justify-center bg-stone-900 rounded-[2rem] shadow-2xl border border-stone-800 mb-8 mt-4 py-8 px-2 sm:py-12 sm:px-6">
+          <div className="w-full max-w-[17rem] sm:max-w-md flex items-center justify-center bg-[#111111] rounded-[2rem] shadow-2xl border border-stone-800 mb-8 mt-4 py-8 px-2 sm:py-12 sm:px-6">
             <div className="font-mono flex items-baseline text-white">
               <span className="text-[2.5rem] leading-none sm:text-6xl lg:text-7xl font-black tracking-tight">
                 {formatStopwatchTime(stopwatchTime).main}
